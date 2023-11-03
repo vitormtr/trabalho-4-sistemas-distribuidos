@@ -1,10 +1,7 @@
 
-import json
 from datetime import datetime, timedelta
-
 from flask import Flask, request, jsonify
 app = Flask(__name__)
-
 
 
 class Server:
@@ -12,7 +9,9 @@ class Server:
     stock_flow = []
     users = {}
 
+
 server = Server()
+
 
 @app.route('/store_new_product', methods=['POST'])
 def store_new_product():
@@ -35,9 +34,64 @@ def store_new_product():
     server.stock_flow.append({"operation": "product stored", "quantity": quantity_to_store, "time": datetime.now()})
     return jsonify({"status": "success", "message": "Product stored successfully"})
 
-@app.route('/get_products', methods=['GET'])
-def get_products():
-    return jsonify({"products": Server.products})
+
+@app.route('/get_products_in_stock', methods=['GET'])
+def get_products_in_stock():
+    products_in_stock = []
+    for product in Server.products:
+        if product['quantity'] > 0:
+            products_in_stock.append({
+                'product': product["name"],
+                'quantity': product["quantity"]
+            })
+
+    return jsonify({"products_in_stock": products_in_stock})
+
+
+@app.route('/get_products_without_movement', methods=['GET'])
+def get_products_without_movement():
+    period_in_seconds = int(request.args.get('period_in_seconds', 10))#10 segundos default
+    current_datetime = datetime.now()
+    products_with_no_movement = []
+
+    for product in Server.products:
+        last_time_sold = product.get('last_time_sold')
+        if last_time_sold is not None:
+            time_period = timedelta(seconds=period_in_seconds)
+            result_datetime = current_datetime - time_period
+
+            if last_time_sold <= result_datetime:
+                products_with_no_movement.append({
+                    "product_name": product["name"],
+                    "code": product["code"],
+                    "last_movement": last_time_sold.isoformat()
+                })
+
+    return jsonify({"products_with_no_movement": products_with_no_movement})
+
+
+@app.route('/get_stock_flow', methods=['GET'])
+def get_stock_flow():
+    period_in_seconds = int(request.args.get('period_in_seconds', 10)) #10 segundos default
+    current_datetime = datetime.now()
+    stock_flow_within_period = []
+
+    for stock_event in reversed(Server.stock_flow):
+        event_time = stock_event.get('time')
+        time_period = timedelta(seconds=period_in_seconds)
+        result_datetime = current_datetime - time_period
+
+        if event_time >= result_datetime:
+            stock_flow_within_period.append({
+                "operation": stock_event["operation"],
+                "quantity": stock_event["quantity"],
+                "time": stock_event["time"].isoformat()
+            })
+        else:
+            break
+
+    return jsonify({"stock_flow_within_period": stock_flow_within_period})
+
 
 @app.route('/subtract_product', methods=['POST'])
 def subtract_product():
@@ -69,6 +123,7 @@ def subtract_product():
                 return jsonify({"status": "error", "message": "Not enough products to subtract"})
     return jsonify({"status": "error", "message": "Product not found"})
 
+
 @app.route('/register_user', methods=['POST'])
 def register_user():
     data = request.get_json()
@@ -80,6 +135,7 @@ def register_user():
 
     server.users[public_key] = {"public_key": public_key, "name": name}
     return jsonify({"status": "success", "message": "User registered"})
+
 
 if __name__ == '__main__':
     app.run(debug=True)
