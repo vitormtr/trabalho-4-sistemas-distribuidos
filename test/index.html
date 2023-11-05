@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>SSE Example</title>
+</head>
+<body>
+    <h1>SSE Example</h1>
+    <div id="sse-container"></div>
+
+    <script>
+        const source = new EventSource('http://localhost:5000/stream');
+        const container = document.getElementById('sse-container');
+        source.onopen = e => console.log('opened', e);
+        source.onerror = e => console.log('error', e);
+        source.onmessage = e => console.log('onmessage', e);
+
+        source.addEventListener("event_type", (event) => {
+            console.log("event_type!");
+        });
+        console.log("llalaa")
+    </script>
+</body>
+</html>

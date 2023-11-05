@@ -1,11 +1,28 @@
 const readline = require('readline');
+const axios = require('axios');
+const EventSource = require('eventsource')
+
 const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout
 });
 
-const current_user = null; 
-const private_key = null; 
+const API_URL = 'http://127.0.0.1:5000';
+
+const source = new EventSource(API_URL + '/stream');
+source.onopen = e => console.log("Conexão com server aberta, escutando notificações");
+source.onerror = e => console.log("Erro: Verifique a conexão com o server, pode ser que o redis não esteja rodando...");
+source.onmessage = e => console.log('onmessage');
+
+source.addEventListener("product-not-being-sold", (event) => {
+    console.log("product-not-being-sold!", event);
+});
+
+source.addEventListener("product-emptying", (event) => {
+    console.log("product-emptying!", event);
+});
+
+const current_user = null;
 
 function getCurrentDateTime() {
     const currentDatetime = new Date();
@@ -14,13 +31,21 @@ function getCurrentDateTime() {
 
 function readUserFromInput() {
     rl.question("Entre com seu nome: ", (name) => {
-        rl.question("Entre com sua chave publica: ", (publicKey) => {
-            rl.question("Entre com o URI remoto: ", (remoteUri) => {
-                const current_user = { name, public_key: publicKey, remote_uri: remoteUri };
-                console.log(current_user);
-                rl.close();
-            });
+        const current_user = { name };
+        console.log(current_user);
+
+        const postData = {
+            'name': name
+        };
+
+        axios.post(API_URL + '/register_user', postData)
+        .then(response => {
+            console.log(response.data['message']);
+        })
+        .catch(error => {
+            console.error('Error:', error);
         });
+        rl.close();
     });
 }
 
@@ -51,7 +76,13 @@ function readProductFromInput() {
                                 minimum_stock: minimumStock,
                                 date: getCurrentDateTime(),
                             };
-                            console.log(product);
+                            axios.post(API_URL + '/store_new_product', product)
+                            .then(response => {
+                                console.log(response.data['message']);
+                            })
+                            .catch(error => {
+                                console.error('Error:', error);
+                            });
                             rl.close();
                         });
                     });
@@ -81,12 +112,19 @@ function readNewProductAndSendToServer() {
 function readProductToSubtractFromInput() {
     rl.question("Entre com o codigo do produto a ser subtraido: ", (code) => {
         rl.question("Entre com a quantidade a ser subtraida: ", (quantityToSubtract) => {
-            const subtractRequest = {
+            const postData = {
                 code,
                 quantity: quantityToSubtract,
                 date: getCurrentDateTime(),
             };
-            console.log(subtractRequest);
+
+            axios.post(API_URL + '/subtract_product', postData)
+            .then(response => {
+                console.log(response.data['message']);
+            })
+            .catch(error => {
+                console.error('Error:', error);
+            });
             rl.close();
         });
     });
@@ -118,7 +156,44 @@ function checkIfThereIsAUserRegistered() {
     }
 }
 
-function menu() {
+function listProductsInStock() {
+    axios.get(API_URL + '/get_products_in_stock')
+    .then(response => {
+        console.log(response.data);
+    })
+    .catch(error => {
+        console.error('Error:', error);
+    });
+}
+
+function getStockFlowByPeriod(periodInSeconds) {
+    const postData = {
+        'period_in_seconds': periodInSeconds
+    }
+    axios.post(API_URL + '/get_stock_flow', postData)
+    .then(response => {
+        console.log(response.data);
+    })
+    .catch(error => {
+        console.error('Error:', error);
+    });
+        
+}
+
+function get_products_without_movimentation_by_period(periodInSeconds) {
+    const postData = {
+        'period_in_seconds': periodInSeconds
+    }
+    axios.post(API_URL + '/get_products_without_movement', postData)
+    .then(response => {
+        console.log(response.data);
+    })
+    .catch(error => {
+        console.error('Error:', error);
+    });
+}
+
+async function menu() {
     console.log("\nMenu:");
     console.log("1. Registrar Usuario");
     console.log("2. Armazenar Produto");
@@ -130,25 +205,29 @@ function menu() {
 
     rl.question("Entre com a sua opção: ", (choice) => {
         if (choice === '1') {
-            console.log("asd")
             readNewUserAndSendToServer();
+            menu();
         } else if (choice === '2') {
             readNewProductAndSendToServer();
+            menu();
         } else if (choice === '3') {
             readProductToSubtractAndSendToServer();
+            menu();
         } else if (choice === '4') {
             if (checkIfThereIsAUserRegistered()) {
-                console.log("Listar produtos em estoque.");
+                listProductsInStock();
             }
             menu();
         } else if (choice === '5') {
             if (checkIfThereIsAUserRegistered()) {
-                console.log("Mostrar fluxo do estoque por periodo.");
+                periodInSeconds = int(input("Entre com o tempo em segundos: "))
+                getStockFlowByPeriod(periodInSeconds);
             }
             menu();
         } else if (choice === '6') {
             if (checkIfThereIsAUserRegistered()) {
-                console.log("Mostrar produtos sem movimentação por periodo.");
+                periodInSeconds = int(input("Entre com o tempo em segundos: "))
+                get_products_without_movimentation_by_period(periodInSeconds);
             }
             menu();
         } else if (choice === '7') {

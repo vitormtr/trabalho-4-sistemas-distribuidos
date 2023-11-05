@@ -1,8 +1,18 @@
 
+import threading, time
 from datetime import datetime, timedelta
-from flask import Flask, request, jsonify
-app = Flask(__name__)
+from flask import Flask, request, jsonify, render_template
+from flask_sse import sse
+from flask_cors import CORS
+import redis
 
+PERIOD_IN_SECONDS_TO_NOTIFY_CLIENT_PRODUCT_NOT_BEING_SOLD: int = 120
+current_user: str = None
+
+app = Flask(__name__)
+app.config["REDIS_URL"] = "redis://localhost"
+app.register_blueprint(sse, url_prefix='/stream')
+CORS(app)
 
 class Server:
     products = []
@@ -11,7 +21,6 @@ class Server:
 
 
 server = Server()
-
 
 @app.route('/store_new_product', methods=['POST'])
 def store_new_product():
@@ -50,27 +59,12 @@ def get_products_in_stock():
 
 @app.route('/get_products_without_movement', methods=['GET'])
 def get_products_without_movement():
-    period_in_seconds = int(request.args.get('period_in_seconds', 10))#10 segundos default
-    current_datetime = datetime.now()
-    products_with_no_movement = []
-
-    for product in Server.products:
-        last_time_sold = product.get('last_time_sold')
-        if last_time_sold is not None:
-            time_period = timedelta(seconds=period_in_seconds)
-            result_datetime = current_datetime - time_period
-
-            if last_time_sold <= result_datetime:
-                products_with_no_movement.append({
-                    "product_name": product["name"],
-                    "code": product["code"],
-                    "last_movement": last_time_sold.isoformat()
-                })
-
+    period_in_seconds = int(request.args.get('period_in_seconds', 10)) #10 segundos default
+    products_with_no_movement = get_products_without_movimentation_by_period(period_in_seconds)
     return jsonify({"products_with_no_movement": products_with_no_movement})
 
 
-@app.route('/get_stock_flow', methods=['GET'])
+@app.route('/get_stock_flow', methods=['POST'])
 def get_stock_flow():
     period_in_seconds = int(request.args.get('period_in_seconds', 10)) #10 segundos default
     current_datetime = datetime.now()
@@ -114,8 +108,7 @@ def subtract_product():
                 product["last_time_sold"] = datetime.now()
 
                 if current_quantity - quantity_to_subtract <= int(product.get('minimum_stock', 0)):
-                    print("Notify client")
-                    # Perform client notification here
+                    notify_client_product_minimum_stock(product)
 
                 print(server.products)
                 return jsonify({"status": "success", "message": "Product subtracted successfully"})
@@ -127,16 +120,55 @@ def subtract_product():
 @app.route('/register_user', methods=['POST'])
 def register_user():
     data = request.get_json()
-    public_key = data.get('public_key')
     name = data.get('name')
 
-    if public_key in server.users:
+    if name in server.users:
         return jsonify({"status": "error", "message": "User already registered"})
 
-    server.users[public_key] = {"public_key": public_key, "name": name}
+    server.users[name] = data
     return jsonify({"status": "success", "message": "User registered"})
 
+# Notify methods...
+def start_monitoring_products_not_being_sold() -> [str]:
+    print("Começando a monitorar produtos...")
+    while True:
+        time.sleep(PERIOD_IN_SECONDS_TO_NOTIFY_CLIENT_PRODUCT_NOT_BEING_SOLD)
+        products_not_being_sold = get_products_without_movimentation_by_period(PERIOD_IN_SECONDS_TO_NOTIFY_CLIENT_PRODUCT_NOT_BEING_SOLD)
+
+        if products_not_being_sold:
+            with app.app_context():
+                notify_client_product_not_being_sold(products_not_being_sold)
+
+def notify_client_product_minimum_stock(product):
+    print("Produto atingiu estoque mínimo! Notificar cliente.")
+    sse.publish({ "product_name": product["name"], "quantity_left": product['quantity'] }, type='product-emptying')
+
+def notify_client_product_not_being_sold(products):
+    print("Há produtos não sendo vendidos! Notificar clientes.")
+    sse.publish({ "products": products }, type='product-not-being-sold')
+
+def get_products_without_movimentation_by_period(period_in_seconds: int):
+    products_with_no_movimentation = []
+    current_datetime = datetime.now()
+    for product in server.products:
+        if product.get('last_time_sold') is not None:
+            last_time_sold = product.get('last_time_sold')
+            time_period = timedelta(seconds=period_in_seconds)
+            result_datetime = current_datetime - time_period
+
+            if last_time_sold <= result_datetime:
+                products_with_no_movimentation.append({ "product_name": product["name"],
+                                                    "code": product["code"],
+                                                    "last_movimentation": str(product["last_time_sold"]) })
+    return products_with_no_movimentation
+
+@app.route('/test-publish-event', methods=['POST'])
+def publish_event():
+    sse.publish({"message": "example_message"}, type='example')
+    return "Event published"
 
 if __name__ == '__main__':
-    app.run(debug=True)
-
+    #thread to monitor products
+    #thread = threading.Thread(target=start_monitoring_products_not_being_sold) 
+    #thread.start()
+    app.run(debug=True, host='0.0.0.0', port=5000)
