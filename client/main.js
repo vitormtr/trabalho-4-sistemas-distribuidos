@@ -30,168 +30,154 @@ function getCurrentDateTime() {
 }
 
 function readUserFromInput() {
-    rl.question("Entre com seu nome: ", (name) => {
-        const current_user = { name };
-        console.log(current_user);
-
+    return new Promise((resolve, reject) => {
+      rl.question("Seu nome: ", (name) => {
         const postData = {
-            'name': name
+          'name': name
         };
-
+  
         axios.post(API_URL + '/register_user', postData)
-        .then(response => {
+          .then(response => {
             console.log(response.data['message']);
-        })
-        .catch(error => {
-            console.error('Error:', error);
-        });
-        rl.close();
+            resolve(); 
+          })
+          .catch(error => {
+            console.error('Erro:', error);
+            reject(error); 
+          });
+      });
     });
-}
-
-function readNewUserAndSendToServer() {
-    rl.question("Registrar Usuário? (S/N) ", (answer) => {
-        if (answer.toLowerCase() === 's') {
-            readUserFromInput();
-        } else {
-            console.log("Operação cancelada.");
-            rl.close();
-        }
-    });
-}
+  }
 
 function readProductFromInput() {
-    rl.question("Entre com o codigo do produto: ", (code) => {
-        rl.question("Entre com o nome do produto: ", (name) => {
-            rl.question("Entre com a descrição do produto: ", (description) => {
-                rl.question("Entre com a quantidade de produtos: ", (quantity) => {
-                    rl.question("Entre com o preço da unidade: ", (unitPrice) => {
-                        rl.question("Entre com o estoque minimo: ", (minimumStock) => {
-                            const product = {
-                                code,
-                                name,
-                                description,
-                                quantity,
-                                unit_price: unitPrice,
-                                minimum_stock: minimumStock,
-                                date: getCurrentDateTime(),
-                            };
-                            axios.post(API_URL + '/store_new_product', product)
-                            .then(response => {
-                                console.log(response.data['message']);
-                            })
-                            .catch(error => {
-                                console.error('Error:', error);
-                            });
-                            rl.close();
-                        });
-                    });
+    return new Promise((resolve) => {
+      rl.question("Código do produto: ", (code) => {
+        rl.question("Nome do produto: ", (name) => {
+          rl.question("Descrição do produto: ", (description) => {
+            rl.question("Quantidade: ", (quantity) => {
+              rl.question("Preço da unidade: ", (unitPrice) => {
+                rl.question("Estoque mínimo: ", (minimumStock) => {
+                  const product = {
+                    code,
+                    name,
+                    description,
+                    quantity,
+                    unit_price: unitPrice,
+                    minimum_stock: minimumStock,
+                    date: getCurrentDateTime(),
+                  };
+                  resolve(product);
                 });
+              });
             });
+          });
         });
+      });
     });
-}
+  }
 
-function readNewProductAndSendToServer() {
-    if (current_user === null) {
-        console.log("Erro: deve existir um usuário previamente registrado para fazer requisições.");
-        rl.close();
-        return;
-    }
-
-    rl.question("Armazenar Produto? (S/N) ", (answer) => {
-        if (answer.toLowerCase() === 's') {
-            readProductFromInput();
-        } else {
-            console.log("Operação cancelada.");
-            rl.close();
-        }
-    });
-}
 
 function readProductToSubtractFromInput() {
-    rl.question("Entre com o codigo do produto a ser subtraido: ", (code) => {
-        rl.question("Entre com a quantidade a ser subtraida: ", (quantityToSubtract) => {
+    return new Promise((resolve, reject) => {
+      rl.question("Código do produto: ", (code) => {
+        rl.question("Quantidade a subtrair: ", (quantityToSubtract) => {
+          if (isNaN(quantityToSubtract) || quantityToSubtract <= 0) {
+            reject(new Error('Quantidade invalida.'));
+          } else {
             const postData = {
-                code,
-                quantity: quantityToSubtract,
-                date: getCurrentDateTime(),
+              code,
+              quantity: quantityToSubtract,
+              date: getCurrentDateTime(),
             };
-
+  
             axios.post(API_URL + '/subtract_product', postData)
-            .then(response => {
+              .then(response => {
                 console.log(response.data['message']);
-            })
-            .catch(error => {
+                resolve(); 
+              })
+              .catch(error => {
                 console.error('Error:', error);
-            });
-            rl.close();
+                reject(error); 
+              });
+          }
+          rl.close();
         });
+      });
     });
-}
+  }
 
-function readProductToSubtractAndSendToServer() {
-    if (current_user === null) {
-        console.log("Erro: deve existir um usuário previamente registrado para fazer requisições.");
-        rl.close();
-        return;
-    }
-
-    rl.question("Lançamento de saída de produto? (S/N) ", (answer) => {
-        if (answer.toLowerCase() === 's') {
-            readProductToSubtractFromInput();
-        } else {
-            console.log("Operação cancelada.");
-            rl.close();
-        }
-    });
-}
-
-function checkIfThereIsAUserRegistered() {
-    if (current_user === null) {
-        console.log("Erro: deve existir um usuário previamente registrado para fazer requisições.");
-        return false;
-    } else {
-        return true;
-    }
-}
+//function checkIfThereIsAUserRegistered() {
+//    if (current_user === null) {
+//        console.log("Erro: deve existir um usuário previamente registrado para fazer requisições.");
+//        return false;
+//    } else {
+//       return true;
+//    }
+//}
 
 function listProductsInStock() {
-    axios.get(API_URL + '/get_products_in_stock')
-    .then(response => {
-        console.log(response.data);
-    })
-    .catch(error => {
-        console.error('Error:', error);
+    return new Promise((resolve, reject) => {
+      axios.get(API_URL + '/get_products_in_stock')
+        .then(response => {
+          console.log(response.data);
+          resolve(response.data);
+        })
+        .catch(error => {
+          console.error('Erro:', error);
+          reject(error);
+        });
     });
-}
+  }
 
-function getStockFlowByPeriod(periodInSeconds) {
-    const postData = {
-        'period_in_seconds': periodInSeconds
-    }
-    axios.post(API_URL + '/get_stock_flow', postData)
-    .then(response => {
-        console.log(response.data);
-    })
-    .catch(error => {
-        console.error('Error:', error);
+  function getStockFlowByPeriod() {
+    return new Promise((resolve, reject) => {
+      rl.question("Periodo em segundos: ", (periodInSeconds) => {
+        if (isNaN(periodInSeconds) || periodInSeconds <= 0) {
+          reject(new Error('Periodo invalido.'));
+        } else {
+          const postData = {
+            'period_in_seconds': periodInSeconds
+          };
+    
+          axios.post(API_URL + '/get_stock_flow', postData)
+            .then(response => {
+              console.log(response.data);
+              resolve(response.data);
+            })
+            .catch(error => {
+              console.error('Erro:', error);
+              reject(error);
+            });
+        }
+      });
     });
-        
-}
+  }
+  
 
-function get_products_without_movimentation_by_period(periodInSeconds) {
-    const postData = {
-        'period_in_seconds': periodInSeconds
-    }
-    axios.post(API_URL + '/get_products_without_movement', postData)
-    .then(response => {
-        console.log(response.data);
-    })
-    .catch(error => {
-        console.error('Error:', error);
+  function getProductsWithoutMovimentationByPeriod() {
+    return new Promise((resolve, reject) => {
+      rl.question("Periodo em segundos: ", (periodInSeconds) => {
+        if (isNaN(periodInSeconds) || periodInSeconds <= 0) {
+          reject(new Error('Periodo invalido.'));
+        } else {
+          const postData = {
+            'period_in_seconds': periodInSeconds
+          };
+  
+          axios.post(API_URL + '/get_products_without_movement', postData)
+            .then(response => {
+              console.log(response.data);
+              resolve(response.data);
+            })
+            .catch(error => {
+              console.error('Error:', error);
+              reject(error);
+            });
+        }
+      });
     });
-}
+  }
+  
 
 async function menu() {
     console.log("\nMenu:");
@@ -203,34 +189,52 @@ async function menu() {
     console.log("6. Mostrar produtos sem movimentação por periodo");
     console.log("7. Sair");
 
-    rl.question("Entre com a sua opção: ", (choice) => {
+    rl.question("Entre com a sua opção: ", async (choice) => {
         if (choice === '1') {
-            readNewUserAndSendToServer();
+            try {
+                await readUserFromInput(); //espera chamada da api terminar
+            } catch (error) {
+                console.error('Erro:', error);                
+            }
             menu();
         } else if (choice === '2') {
-            readNewProductAndSendToServer();
-            menu();
-        } else if (choice === '3') {
-            readProductToSubtractAndSendToServer();
-            menu();
-        } else if (choice === '4') {
-            if (checkIfThereIsAUserRegistered()) {
-                listProductsInStock();
+            try {
+              const product = await readProductFromInput(); 
+              console.log("Informações do produto recebidas:", product);
+            } catch (error) {
+              console.error('Erro:', error);
             }
             menu();
-        } else if (choice === '5') {
-            if (checkIfThereIsAUserRegistered()) {
-                periodInSeconds = int(input("Entre com o tempo em segundos: "))
-                getStockFlowByPeriod(periodInSeconds);
+          } else if (choice === '3') {
+            try {
+              const productToSubtract = await readProductToSubtractFromInput();
+              console.log("Informações recebidas:", productToSubtract);
+            } catch (error) {
+              console.error('Erro:', error);
             }
             menu();
-        } else if (choice === '6') {
-            if (checkIfThereIsAUserRegistered()) {
-                periodInSeconds = int(input("Entre com o tempo em segundos: "))
-                get_products_without_movimentation_by_period(periodInSeconds);
+          } else if (choice === '4') {
+            try {
+              await listProductsInStock();
+            } catch (error) {
+              console.error('Erro:', error);
             }
             menu();
-        } else if (choice === '7') {
+          } else if (choice === '5') {
+            try {
+              await getStockFlowByPeriod();
+            } catch (error) {
+              console.error('Erro:', error);
+            }
+            menu();
+          } else if (choice === '6') {
+            try {
+              await getProductsWithoutMovimentationByPeriod();
+            } catch (error) {
+              console.error('Erro:', error);
+            }
+            menu();
+          } else if (choice === '7') {
             rl.close();
         } else {
             console.log("Opção Inválida.");
