@@ -61,7 +61,8 @@ def get_products_in_stock():
 
 @app.route('/get_stock_flow', methods=['POST'])
 def get_stock_flow():
-    period_in_seconds = int(request.args.get('period_in_seconds', 10))  # 10 seconds default
+    data = request.get_json()
+    period_in_seconds = int(data['period_in_seconds'])
     current_datetime = datetime.now()
     stock_flow_within_period = []
 
@@ -78,7 +79,7 @@ def get_stock_flow():
             stock_flow_within_period.append({
                 "operation": stock_event["operation"],
                 "quantity": stock_event["quantity"],
-                "time": event_time.isoformat()
+                "time": stock_event["time"]
             })
         else:
             break
@@ -88,7 +89,8 @@ def get_stock_flow():
 
 @app.route('/get_products_without_movement', methods=['POST'])
 def get_products_without_movement():
-    period_in_seconds = int(request.args.get('period_in_seconds', 10))
+    data = request.get_json()
+    period_in_seconds = int(data['period_in_seconds'])
     products_with_no_movement = get_products_without_movement_by_period(period_in_seconds)
     return jsonify({"products_with_no_movement": products_with_no_movement})
 
@@ -127,7 +129,6 @@ def subtract_product():
 
                 server.stock_flow.append(
                     {"operation": "product subtracted", "quantity": quantity_to_subtract, "time": datetime.now()})
-
                 product["last_time_sold"] = datetime.now()
 
                 if new_quantity <= int(product.get('minimum_stock', 0)):
