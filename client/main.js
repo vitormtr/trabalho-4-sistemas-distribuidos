@@ -15,11 +15,29 @@ source.onerror = e => console.log("Erro: Verifique a conexão com o server, pode
 source.onmessage = e => console.log('onmessage');
 
 source.addEventListener("product-not-being-sold", (event) => {
-    console.log("product-not-being-sold!", event);
+    var json = JSON.parse(event.data);
+    console.log("Alerta de produto(s) não sendo vendido(s)! ");
+    for(let i = 0; i < json.products.length; i++) {
+        let product = json.products[i];
+        console.log("Produto: " 
+        + product.product_name
+        + " com codigo "
+        + product.code
+        + " foi movimentado por último em " 
+        + product.last_movement);
+    }
 });
 
 source.addEventListener("product-emptying", (event) => {
-    console.log("product-emptying!", event);
+    console.log("Alerta de produto esvaziando!");
+    console.log("Produto: " 
+        + event.data["product_name"]
+        + " codigo "
+        + event.data["code"]
+        + " com " 
+        + event.data["quantity_left"] 
+        + " unidades, mas o mínimo é " 
+        + event.data["minimum_stock"]);
 });
 
 const current_user = null;
