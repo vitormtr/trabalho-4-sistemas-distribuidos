@@ -49,8 +49,8 @@ function readUserFromInput() {
     });
   }
 
-function readProductFromInput() {
-    return new Promise((resolve) => {
+  function readProductFromInput() {
+    return new Promise((resolve, reject) => {
       rl.question("Código do produto: ", (code) => {
         rl.question("Nome do produto: ", (name) => {
           rl.question("Descrição do produto: ", (description) => {
@@ -66,7 +66,16 @@ function readProductFromInput() {
                     minimum_stock: minimumStock,
                     date: getCurrentDateTime(),
                   };
-                  resolve(product);
+                  axios
+                    .post(API_URL + '/store_new_product', product)
+                    .then((response) => {
+                      console.log(response.data['message']);
+                      resolve(product);
+                    })
+                    .catch((error) => {
+                      console.error('Error:', error);
+                      reject(error);
+                    });
                 });
               });
             });
@@ -75,36 +84,35 @@ function readProductFromInput() {
       });
     });
   }
-
-
-function readProductToSubtractFromInput() {
-    return new Promise((resolve, reject) => {
-      rl.question("Código do produto: ", (code) => {
-        rl.question("Quantidade a subtrair: ", (quantityToSubtract) => {
-          if (isNaN(quantityToSubtract) || quantityToSubtract <= 0) {
-            reject(new Error('Quantidade invalida.'));
-          } else {
-            const postData = {
-              code,
-              quantity: quantityToSubtract,
-              date: getCurrentDateTime(),
-            };
   
-            axios.post(API_URL + '/subtract_product', postData)
-              .then(response => {
-                console.log(response.data['message']);
-                resolve(); 
-              })
-              .catch(error => {
-                console.error('Error:', error);
-                reject(error); 
-              });
-          }
-          rl.close();
+
+  function readProductToSubtractFromInput() {
+    return new Promise((resolve, reject) => {
+        rl.question("Código do produto: ", (code) => {
+            rl.question("Quantidade a subtrair: ", (quantityToSubtract) => {
+                if (isNaN(quantityToSubtract) || quantityToSubtract <= 0) {
+                    reject(new Error('Quantidade inválida.'));
+                } else {
+                    const postData = {
+                        code,
+                        quantity: quantityToSubtract,
+                        date: getCurrentDateTime(),
+                    };
+
+                    axios.post(API_URL + '/subtract_product', postData)
+                        .then(response => {
+                            console.log(response.data['message']);
+                            resolve();
+                        })
+                        .catch(error => {
+                            console.error('Error:', error);
+                            reject(error);
+                        });
+                }
+            });
         });
-      });
     });
-  }
+}
 
 //function checkIfThereIsAUserRegistered() {
 //    if (current_user === null) {
@@ -154,7 +162,7 @@ function listProductsInStock() {
   }
   
 
-  function getProductsWithoutMovimentationByPeriod() {
+  function getProductsWithoutMovementByPeriod() {
     return new Promise((resolve, reject) => {
       rl.question("Periodo em segundos: ", (periodInSeconds) => {
         if (isNaN(periodInSeconds) || periodInSeconds <= 0) {
@@ -192,23 +200,21 @@ async function menu() {
     rl.question("Entre com a sua opção: ", async (choice) => {
         if (choice === '1') {
             try {
-                await readUserFromInput(); //espera chamada da api terminar
+                await readUserFromInput();
             } catch (error) {
                 console.error('Erro:', error);                
             }
             menu();
         } else if (choice === '2') {
             try {
-              const product = await readProductFromInput(); 
-              console.log("Informações do produto recebidas:", product);
+              await readProductFromInput(); 
             } catch (error) {
               console.error('Erro:', error);
             }
             menu();
           } else if (choice === '3') {
             try {
-              const productToSubtract = await readProductToSubtractFromInput();
-              console.log("Informações recebidas:", productToSubtract);
+              await readProductToSubtractFromInput();
             } catch (error) {
               console.error('Erro:', error);
             }
@@ -229,13 +235,14 @@ async function menu() {
             menu();
           } else if (choice === '6') {
             try {
-              await getProductsWithoutMovimentationByPeriod();
+              await getProductsWithoutMovementByPeriod();
             } catch (error) {
               console.error('Erro:', error);
             }
             menu();
           } else if (choice === '7') {
             rl.close();
+            
         } else {
             console.log("Opção Inválida.");
             menu();
