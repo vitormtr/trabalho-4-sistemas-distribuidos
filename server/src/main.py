@@ -7,7 +7,7 @@ from flask_sse import sse
 from flask_cors import CORS
 import redis
 
-PERIOD_IN_SECONDS_TO_NOTIFY_CLIENT_PRODUCT_NOT_BEING_SOLD: int = 120
+PERIOD_IN_SECONDS_TO_NOTIFY_CLIENT_PRODUCT_NOT_BEING_SOLD: int = 10
 current_user: str = None
 
 app = Flask(__name__)
@@ -165,7 +165,9 @@ def start_monitoring_products_not_being_sold() -> [str]:
 
 def notify_client_product_minimum_stock(product):
     print("Produto atingiu estoque mínimo! Notificar cliente.")
-    sse.publish({ "product_name": product["name"], "quantity_left": product['quantity'] }, type='product-emptying')
+    sse.publish({ "code": product["code"], "product_name": product["name"],
+                 "quantity_left": product['quantity'], "minimum_quantity": product['minimum_stock'] },
+                type='product-emptying')
 
 def notify_client_product_not_being_sold(products):
     print("Há produtos não sendo vendidos! Notificar clientes.")
@@ -180,6 +182,6 @@ def publish_event():
 
 if __name__ == '__main__':
     #thread to monitor products
-    #thread = threading.Thread(target=start_monitoring_products_not_being_sold) 
-    #thread.start()
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    thread = threading.Thread(target=start_monitoring_products_not_being_sold) 
+    thread.start()
+    app.run(debug=False, host='0.0.0.0', port=5000)
